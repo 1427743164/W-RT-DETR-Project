@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -97,6 +99,19 @@ class WaveletUpsample(nn.Module):
         self.up_conv = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2)
         self.bn = nn.BatchNorm2d(in_channels)
         self.act = nn.SiLU()
+        self._init_weights()
+
+    def _init_weights(self):
+        # 让转置卷积一开始表现得像双线性插值 (Bilinear Interpolation)
+        # 这样模型是从“已知的好状态”开始学习，而不是从零开始
+        w = self.up_conv.weight.data
+        f = math.ceil(w.size(2) / 2)
+        c = (2 * f - 1 - f % 2) / (2. * f)
+        for i in range(w.size(2)):
+            for j in range(w.size(3)):
+                w[0, 0, i, j] = (1 - math.fabs(i / f - c)) * (1 - math.fabs(j / f - c))
+        for c in range(1, w.size(0)):
+            w[c, 0, :, :] = w[0, 0, :, :]
 
     def forward(self, x):
         return self.act(self.bn(self.up_conv(x)))
