@@ -3,3 +3,6 @@ datasets/
 
 # 忽略 W-RT-DETR-Runs 文件夹（包括其所有内容）
 W-RT-DETR-Runs/
+
+__pycache__/
+*.pyc
