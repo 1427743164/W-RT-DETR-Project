@@ -1,0 +1,9 @@
+# UAVDT Dataset Configuration
+path: /path/to/your/UAVDT
+train: train/images
+val: val/images
+
+names:
+  0: car
+  1: truck
+  2: bus

@@ -1,0 +1,9 @@
+# TinyPerson Dataset Configuration
+# 注意：TinyPerson 只有两类 (sea, earth person)，主要难点是海面背景
+path: /path/to/your/TinyPerson
+train: train/images
+val: val/images
+
+names:
+  0: sea_person
+  1: earth_person
