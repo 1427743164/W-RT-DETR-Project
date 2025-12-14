@@ -1,5 +1,7 @@
-from ultralytics import RTDETR  # 也可以用 YOLO 类，但用 RTDETR 更明确
+from ultralytics import RTDETR
 import torch
+import sys
+import os
 
 def continueTrain():
     # 1. 加载“最后一次存档”
@@ -12,56 +14,57 @@ def continueTrain():
 
 
 def main():
-    # ---------------------------------------------------
-    # 1. 设置设备 (自动检测 GPU)
-    # ---------------------------------------------------
+    # 1. 设置设备
     device = '0' if torch.cuda.is_available() else 'cpu'
     print(f"🚀 Training Device: {device}")
 
-    # ---------------------------------------------------
-    # 2. 加载模型 (构建 W-RT-DETR)
-    # ---------------------------------------------------
-    # 注意：这里加载的是 .yaml 配置文件，表示从头开始构建网络结构
-    # 它会自动读取你的 w-rtdetr-l.yaml，并调用 block.py 里的 FrequencyAwareFusion
+    # 2. 强力清理显存
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    # 3. 构建模型
+    # 先读取你的配置文件，建立 W-RT-DETR 架构
     model = RTDETR('w-rtdetr-l.yaml')
 
-    # (可选) 如果你想加载预训练权重来加速收敛 (比如官方的 rtdetr-l.pt)
-    # 你可以先加载权重，但由于我们改了网络层数和结构，部分权重可能会由 strict=False 忽略
-    # model = RTDETR('rtdetr-l.pt')
-    # model = RTDETR('w-rtdetr-l.yaml').load('rtdetr-l.pt') # 这种混合写法也可以尝试
+    # 4. 加载预训练权重 (关键步骤)
+    # 这会抛出警告说 "Missing keys"（因为你的 backbone 变了），这是完全正常的！
+    # 不要因为看到警告就觉得错了，只要 Head 加载进去了就行。
+    try:
+        if not os.path.exists('rtdetr-l.pt'):
+            print("⚠️ 本地未找到 rtdetr-l.pt，正在尝试自动下载...")
 
-    # ---------------------------------------------------
-    # 3. 开始训练 (Start Training)
-    # ---------------------------------------------------
+        # 加载权重，strict=False 会自动忽略不匹配的小波层
+        model = model.load('rtdetr-l.pt')
+        print("✅ 成功加载预训练权重 (Head 部分已继承，Backbone 将重新学习)")
+    except Exception as e:
+        print(f"⚠️ 权重加载跳过: {e}")
+
+    # 5. 开始训练
     results = model.train(
-        data='data/visdrone.yaml',  # 数据集配置
-        epochs=100,  # 训练轮数 (论文建议 72-100)
-        imgsz=640,  # 输入图像尺寸 (VisDrone 建议 640 或 1024)
-        batch=2,  # 批次大小 (根据你显存调整，显存大可以设为 8 或 16)
+        data='data/visdrone.yaml',
+        epochs=100,
+        imgsz=640,
+        batch=2,
+        workers=0,  # Windows 必须为 0
 
-        # 优化参数
-        optimizer='AdamW',  # RT-DETR 标配优化器
-        lr0=0.0001,  # 初始学习率
+        # === 🟢 显式增强 Warmup (让 NWD 更稳) ===
+        warmup_epochs=5,  # 从默认 3 轮增加到 5 轮，给模型更多适应时间
+        warmup_bias_lr=0.05,  # 预热时的 Bias 学习率调低一点
+        warmup_momentum=0.5,  # 预热时的动量调低，起步更柔和
+        # ========================================
 
-        # 工程参数
-        device=device,  # 使用 GPU
-        project='W-RT-DETR-Runs',  # 训练日志保存的根目录
-        name='visdrone_exp_v1',  # 本次实验的名称 (结果会存在 W-RT-DETR-Runs/visdrone_exp_v1)
-        workers=4,  # 数据加载线程数
-        amp=False,  # 如果遇到 NWD Loss 导致的 NaN 错误，设为 False 关闭混合精度
+        optimizer='AdamW',
+        lr0=0.0001,
+        project='W-RT-DETR-Runs',
+        name='visdrone_pretrained_v1',
 
-        # 调试参数 (可选)
-        exist_ok=True,  # 如果目录存在是否覆盖
-        plots=True  # 自动画出混淆矩阵和训练曲线
+        amp=True,  # 混合精度，如果 NWD 报错 NaN 就改成 False
+        plots=True,
+        exist_ok=True
     )
 
-
-    # continueTrain()
-
-
-    print("✅ 训练完成！Check your results in 'W-RT-DETR-Runs/'")
+    print("✅ 训练完成！")
 
 
 if __name__ == '__main__':
-    # Windows 下的多进程保护
     main()
