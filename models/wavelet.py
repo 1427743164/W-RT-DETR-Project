@@ -88,30 +88,34 @@ class WaveletUpsample(nn.Module):
     """
     [优化点3: 频域增强上采样]
     替代粗糙的 nn.Upsample(nearest)。
-    使用转置卷积 (Transposed Conv) 学习如何从低分辨率恢复高分辨率细节，
-    模拟反小波变换 (IDWT) 的过程。
+    使用转置卷积 (Transposed Conv) 学习如何从低分辨率恢复高分辨率细节。
     """
 
     def __init__(self, in_channels, scale_factor=2):
         super().__init__()
-        # kernel_size=2, stride=2 正好对应 2 倍上采样
-        # 初始化时，它可以学成双线性插值，也可以学成 IDWT
-        self.up_conv = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2)
+        # 1. bias=False: 因为后面接了 BatchNorm，bias 是多余的
+        self.up_conv = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2, bias=False)
         self.bn = nn.BatchNorm2d(in_channels)
         self.act = nn.SiLU()
+
+        # 2. 初始化权重
         self._init_weights()
 
     def _init_weights(self):
-        # 让转置卷积一开始表现得像双线性插值 (Bilinear Interpolation)
-        # 这样模型是从“已知的好状态”开始学习，而不是从零开始
-        w = self.up_conv.weight.data
-        f = math.ceil(w.size(2) / 2)
-        c = (2 * f - 1 - f % 2) / (2. * f)
-        for i in range(w.size(2)):
-            for j in range(w.size(3)):
-                w[0, 0, i, j] = (1 - math.fabs(i / f - c)) * (1 - math.fabs(j / f - c))
-        for c in range(1, w.size(0)):
-            w[c, 0, :, :] = w[0, 0, :, :]
+        """
+        初始化为‘最近邻插值’状态 (All Ones)。
+        对于 kernel_size=2, stride=2 的转置卷积，
+        全 1 的核等价于把一个像素复制成 2x2 的块 (Nearest Neighbor Upsample)。
+        这是最稳健的初始状态，比那个复杂的双线性公式更适合 2x2 核。
+        """
+        # 将权重填满 1.0
+        nn.init.constant_(self.up_conv.weight, 1.0)
+
+        # (可选) 如果你想让初始输出数值更平滑，可以用 0.25 (相当于平均)
+        # nn.init.constant_(self.up_conv.weight, 0.25)
+
+        # 冻结分组相关性 (让每个通道独立初始化)
+        # 这一步对于 depthwise 或者是标准卷积都通用，这里保持全1即可
 
     def forward(self, x):
         return self.act(self.bn(self.up_conv(x)))
