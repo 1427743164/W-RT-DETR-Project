@@ -93,7 +93,7 @@ def main():
         epochs=100,
         imgsz=640,
         batch=2,
-        workers=8,  # Windows 必须为 0
+        workers=4,  # Windows 必须为 0
 
         # === 🟢 显式增强 Warmup (让 NWD 更稳) ===
         warmup_epochs=5,  # 从默认 3 轮增加到 5 轮，给模型更多适应时间
@@ -110,10 +110,6 @@ def main():
         plots=True,
         exist_ok=True
     )
-
-    # continueTrain()
-
-    # train_restart_with_weights()
 
     print("✅ 训练完成！")
 
