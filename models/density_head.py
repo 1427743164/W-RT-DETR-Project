@@ -15,11 +15,16 @@ class DensityGuidedQuerySelector(nn.Module):
 
         # 简单的密度预测头 [cite: 130-135]
         self.density_head = nn.Sequential(
+            # 第一层 Conv 输出是 hidden_dim // 2 (即 128)
             nn.Conv2d(hidden_dim, hidden_dim // 2, 3, padding=1),
-            nn.GroupNorm(32, hidden_dim),
+
+            # [修改这里] GroupNorm 的通道数必须也是 hidden_dim // 2 (即 128)
+            nn.GroupNorm(num_groups=32, num_channels=hidden_dim // 2),
+
             nn.ReLU(),
+            # 下一层 Conv 的输入也是 hidden_dim // 2
             nn.Conv2d(hidden_dim // 2, 1, 1),
-            nn.Sigmoid()  # 输出 0-1 之间的密度/概率
+            nn.Sigmoid()
         )
 
     def calculate_high_freq_energy(self, haar_feats):
