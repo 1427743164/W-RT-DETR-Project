@@ -59,7 +59,8 @@ class FrequencyAwareFusion(nn.Module):
 
         # 2. 最终融合
         self.fusion_conv = nn.Conv2d(freq_c, out_channels, 1)
-        self.bn = nn.BatchNorm2d(out_channels)
+        # self.bn = nn.BatchNorm2d(out_channels)
+        self.bn = nn.GroupNorm(num_groups=32, num_channels=out_channels)
         self.act = nn.SiLU()
 
     def forward(self, x):
@@ -95,7 +96,8 @@ class WaveletUpsample(nn.Module):
         super().__init__()
         # 1. bias=False: 因为后面接了 BatchNorm，bias 是多余的
         self.up_conv = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2, bias=True)
-        self.bn = nn.BatchNorm2d(in_channels)
+        # self.bn = nn.BatchNorm2d(in_channels)
+        self.bn = nn.GroupNorm(num_groups=32, num_channels=in_channels)
         self.act = nn.SiLU()
 
         # 2. 初始化权重

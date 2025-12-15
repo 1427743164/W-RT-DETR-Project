@@ -16,6 +16,7 @@ class DensityGuidedQuerySelector(nn.Module):
         # 简单的密度预测头 [cite: 130-135]
         self.density_head = nn.Sequential(
             nn.Conv2d(hidden_dim, hidden_dim // 2, 3, padding=1),
+            nn.GroupNorm(32, hidden_dim),
             nn.ReLU(),
             nn.Conv2d(hidden_dim // 2, 1, 1),
             nn.Sigmoid()  # 输出 0-1 之间的密度/概率
@@ -68,6 +69,10 @@ class DensityGuidedQuerySelector(nn.Module):
 
         # (B, Num_Queries, 2) -> (cx, cy)
         ref_points = torch.stack([topk_x, topk_y], dim=-1).squeeze(1)
+
+        if self.training and torch.rand(1).item() < 0.01:  # 只有 1% 的概率打印，防止刷屏
+            print(
+                f"\n🔍 [Density Head Check] Mean: {density_map.mean().item():.4f}, Max: {density_map.max().item():.4f}, Min: {density_map.min().item():.4f}")
 
         return ref_points, density_map
 
