@@ -94,7 +94,7 @@ class WaveletUpsample(nn.Module):
     def __init__(self, in_channels, scale_factor=2):
         super().__init__()
         # 1. bias=False: 因为后面接了 BatchNorm，bias 是多余的
-        self.up_conv = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2, bias=False)
+        self.up_conv = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2, bias=True)
         self.bn = nn.BatchNorm2d(in_channels)
         self.act = nn.SiLU()
 
